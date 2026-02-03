@@ -1,8 +1,44 @@
 import MacroLineChart from '@/components/MacroLineChart';
 
-// Force the page to always fetch fresh data from the API
+// Force the page to always fetch fresh data
 export const dynamic = 'force-dynamic';
 
+const ALPHA_VANTAGE_KEY = 'G3MRG40E7MG8QEOB';
+
+/**
+ * Fetches Live Market Data from Alpha Vantage
+ * Uses SPY (S&P 500), UUP (Dollar Index), and IEF (Treasury Yield Proxy)
+ */
+async function fetchMarketPrice(symbol: string) {
+  try {
+    const res = await fetch(
+      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`,
+      { next: { revalidate: 60 } } // Refresh data every minute
+    );
+    const data = await res.json();
+    const quote = data["Global Quote"];
+    
+    if (!quote || !quote["05. price"]) {
+      return { price: "---", change: "0.00%", pos: true };
+    }
+
+    const price = parseFloat(quote["05. price"]);
+    const changePercent = quote["10. change percent"];
+    
+    return {
+      price: price.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      change: changePercent,
+      pos: !changePercent.startsWith('-')
+    };
+  } catch (error) {
+    console.error(`Market fetch failed for ${symbol}:`, error);
+    return { price: "ERR", change: "0.00%", pos: true };
+  }
+}
+
+/**
+ * Fetches Macro Series from your Render API
+ */
 async function fetchSeries(slug: string) {
   try {
     const res = await fetch(`https://macro-api-l59k.onrender.com/series/${slug}`, { 
@@ -14,7 +50,6 @@ async function fetchSeries(slug: string) {
 
     if (!json || !json.data || !Array.isArray(json.data)) return { data: [] };
 
-    // DATA FIX: Formats the data correctly for the chart library
     const cleanData = json.data.map((item: any) => ({
       time: item.date,
       value: item.value
@@ -22,34 +57,36 @@ async function fetchSeries(slug: string) {
 
     return { ...json, data: cleanData };
   } catch (error) {
-    console.error(`Fetch failed for ${slug}:`, error);
+    console.error(`Macro fetch failed for ${slug}:`, error);
     return { data: [] };
   }
 }
 
 export default async function MacroPage() {
-  // 1. FETCH ALL DATA
-  // Includes 'recessions' as the 5th series to drive the gray vertical bars
-  const [gdp, unemployment, cpi, fedFunds, recessions] = await Promise.all([
+  // 1. PARALLEL FETCHING: Market Data + Macro Database Data
+  const [
+    gdp, 
+    unemployment, 
+    cpi, 
+    fedFunds, 
+    recessions,
+    sp500,
+    dxy,
+    yields
+  ] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
     fetchSeries('cpi_headline'),
     fetchSeries('fed_funds'),
-    fetchSeries('recessions')
+    fetchSeries('recessions'),
+    fetchMarketPrice('SPY'),  // S&P 500 Proxy
+    fetchMarketPrice('UUP'),  // Dollar Index Proxy
+    fetchMarketPrice('IEF')   // 7-10Y Treasury Proxy
   ]);
 
-  // 2. DYNAMIC SIDEBAR LOGIC
-  // Current live values: GDP 24.0T and Unemployment 4.4%
+  // 2. DYNAMIC SIDEBAR LOGIC (Database values)
   const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
   const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
-
-  // 3. LIVE MARKET DATA
-  // Currently simulated values as seen in the live terminal
-  const marketData = {
-    sp500: { price: "5,026.11", change: "+0.45%", pos: true },
-    yield10y: { price: "4.122%", change: "-0.01%", pos: false },
-    dxy: { price: "103.98", change: "+0.12%", pos: true }
-  };
 
   return (
     <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', backgroundColor: 'transparent', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' }}>
@@ -58,7 +95,7 @@ export default async function MacroPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
-          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.9 (LIVE)</span>
+          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 3.0 (LIVE DATA)</span>
         </div>
         <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
           <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
@@ -74,12 +111,14 @@ export default async function MacroPage() {
           <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             
-            <WatchlistItem label="S&P 500" value={marketData.sp500.price} change={marketData.sp500.change} isPositive={marketData.sp500.pos} />
-            <WatchlistItem label="US 10Y Yield" value={marketData.yield10y.price} change={marketData.yield10y.change} isPositive={marketData.yield10y.pos} />
-            <WatchlistItem label="DXY Index" value={marketData.dxy.price} change={marketData.dxy.change} isPositive={marketData.dxy.pos} />
+            {/* Real-Time Market Assets from Alpha Vantage */}
+            <WatchlistItem label="S&P 500 (SPY)" value={sp500.price} change={sp500.change} isPositive={sp500.pos} />
+            <WatchlistItem label="US 10Y Yield (IEF)" value={yields.price} change={yields.change} isPositive={yields.pos} />
+            <WatchlistItem label="DXY Index (UUP)" value={dxy.price} change={dxy.change} isPositive={dxy.pos} />
             
             <div style={{ height: '1px', background: '#1b2226', margin: '5px 0' }} />
             
+            {/* Dynamic Macro Data from Database */}
             <WatchlistItem 
                label="Real GDP" 
                value={typeof latestGDPValue === 'number' ? `${(latestGDPValue / 1000).toFixed(1)}T` : "---"} 
