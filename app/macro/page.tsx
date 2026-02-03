@@ -1,16 +1,34 @@
 import MacroLineChart from '@/components/MacroLineChart';
 
 async function fetchSeries(slug: string) {
-  const res = await fetch(`https://macro-api-l59k.onrender.com/series/${slug}`, { cache: 'no-store' });
-  if (!res.ok) return { data: [] };
-  
-  const json = await res.json();
-  // DATA FIX: Rename 'date' to 'time' for the chart
-  const cleanData = json.data.map((item: any) => ({
-    time: item.date,
-    value: item.value
-  }));
-  return { ...json, data: cleanData };
+  try {
+    const res = await fetch(`https://macro-api-l59k.onrender.com/series/${slug}`, { 
+      cache: 'no-store' 
+    });
+
+    if (!res.ok) {
+      console.error(`API Error: ${res.status}`);
+      return { data: [] };
+    }
+
+    const json = await res.json();
+
+    // SAFETY CHECK: This prevents the 'map' error by ensuring data exists
+    if (!json || !json.data || !Array.isArray(json.data)) {
+      console.error(`Invalid data format for ${slug}:`, json);
+      return { data: [] };
+    }
+
+    const cleanData = json.data.map((item: any) => ({
+      time: item.date,
+      value: item.value
+    }));
+
+    return { ...json, data: cleanData };
+  } catch (error) {
+    console.error(`Fetch failed for ${slug}:`, error);
+    return { data: [] };
+  }
 }
 
 export default async function MacroPage() {
