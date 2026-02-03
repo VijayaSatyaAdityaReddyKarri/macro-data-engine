@@ -1,5 +1,7 @@
-export const dynamic = 'force-dynamic';
 import MacroLineChart from '@/components/MacroLineChart';
+
+// Force the page to always fetch fresh data from the API
+export const dynamic = 'force-dynamic';
 
 async function fetchSeries(slug: string) {
   try {
@@ -7,19 +9,12 @@ async function fetchSeries(slug: string) {
       cache: 'no-store' 
     });
 
-    if (!res.ok) {
-      console.error(`API Error: ${res.status}`);
-      return { data: [] };
-    }
-
+    if (!res.ok) return { data: [] };
     const json = await res.json();
 
-    // SAFETY CHECK: This prevents the 'map' error by ensuring data exists
-    if (!json || !json.data || !Array.isArray(json.data)) {
-      console.error(`Invalid data format for ${slug}:`, json);
-      return { data: [] };
-    }
+    if (!json || !json.data || !Array.isArray(json.data)) return { data: [] };
 
+    // DATA FIX: Formats the data correctly for the chart library
     const cleanData = json.data.map((item: any) => ({
       time: item.date,
       value: item.value
@@ -33,70 +28,89 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  const [gdp, unemployment] = await Promise.all([
-      fetchSeries('real_gdp'), 
-      fetchSeries('unemployment_rate')
+  // Parallel Fetching: Grabs all 3 series at the same time for speed
+  const [gdp, unemployment, cpi] = await Promise.all([
+    fetchSeries('real_gdp'),
+    fetchSeries('unemployment_rate'),
+    fetchSeries('cpi_headline')
   ]);
 
   return (
-    <main className="macro-grid">
-      {/* SIDEBAR (Watchlist) */}
-      <aside className="card">
-        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.5, marginBottom: 16, letterSpacing: 1 }}>
-          WATCHLIST
+    <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', backgroundColor: '#050708', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' }}>
+      
+      {/* TERMINAL HEADER */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
+          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.1 (LIVE)</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <WatchlistItem label="S&P 500" value="4,783.45" change="+0.54%" isPositive={true} />
-          <WatchlistItem label="10Y Yield" value="4.12%" change="-0.05%" isPositive={false} />
-          <WatchlistItem label="USD Index" value="103.40" change="+0.12%" isPositive={true} />
-          <div style={{ height: 1, background: '#1b2226', margin: '8px 0' }} />
-          <WatchlistItem label="Real GDP" value="27.6T" change="+3.3%" isPositive={true} />
-          <WatchlistItem label="Unemployment" value="3.7%" change="0.0%" isPositive={true} />
+        <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
+          <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
+          <div>REGION: US_MACRO</div>
         </div>
-      </aside>
+      </header>
 
-      {/* MAIN CONTENT */}
-      <section style={{ display: 'grid', gap: 20 }}>
-        {/* Header with DEBUG RED TEXT */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontWeight: 800, fontSize: 24, letterSpacing: -0.5 }}>Sage's Terminal</h1>
-            <span style={{ color: 'red', fontSize: 10, fontWeight: 'bold' }}>VERSION 2.0 (LIVE)</span>
+      {/* GRID CONTAINER */}
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '25px' }}>
+        
+        {/* SIDEBAR WATCHLIST */}
+        <aside style={{ backgroundColor: '#0b0f0f', border: '1px solid #1b2226', borderRadius: '12px', padding: '20px', height: 'fit-content' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <WatchlistItem label="S&P 500" value="4,906.19" change="+1.12%" isPositive={true} />
+            <WatchlistItem label="US 10Y Yield" value="4.155%" change="-0.02%" isPositive={false} />
+            <WatchlistItem label="DXY Index" value="104.12" change="+0.08%" isPositive={true} />
+            <div style={{ height: '1px', background: '#1b2226', margin: '5px 0' }} />
+            <WatchlistItem label="Real GDP" value="27.6T" change="+3.3%" isPositive={true} />
+            <WatchlistItem label="Unemployment" value="3.7%" change="0.0%" isPositive={true} />
           </div>
-          <div style={{ fontSize: 12, opacity: 0.5 }}>LIVE CONNECTION: ACTIVE</div>
-        </div>
+        </aside>
 
-        {/* Charts */}
-        <div className="card">
-          <MacroLineChart
-            title="Economic Output"
-            subtitle="Real GDP (Billions)"
-            series={[{ id: 'gdp', name: 'Real GDP', data: gdp.data }]}
-            defaultRange="MAX"
-          />
-        </div>
+        {/* MAIN CHART GRID */}
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
+          
+          {/* Top Row: Inflation (Full Width) */}
+          <div style={{ gridColumn: '1 / -1', backgroundColor: '#0b0f0f', border: '1px solid #1b2226', borderRadius: '12px', padding: '20px' }}>
+            <MacroLineChart 
+              title="Inflation Monitor" 
+              subtitle="Consumer Price Index (Headline)" 
+              series={[{ id: 'cpi', name: 'CPI Index', data: cpi.data }]} 
+              defaultRange="MAX" 
+            />
+          </div>
 
-        <div className="card">
-          <MacroLineChart
-            title="Labor Market"
-            subtitle="Unemployment Rate (%)"
-            series={[{ id: 'ur', name: 'Unemployment', data: unemployment.data, unit: '%' }]}
-            defaultRange="5Y"
-          />
-        </div>
-      </section>
+          {/* Bottom Left: Growth */}
+          <div style={{ backgroundColor: '#0b0f0f', border: '1px solid #1b2226', borderRadius: '12px', padding: '20px' }}>
+            <MacroLineChart 
+              title="Economic Growth" 
+              subtitle="Real GDP (Billions)" 
+              series={[{ id: 'gdp', name: 'Real GDP', data: gdp.data }]} 
+              defaultRange="5Y" 
+            />
+          </div>
+
+          {/* Bottom Right: Labor */}
+          <div style={{ backgroundColor: '#0b0f0f', border: '1px solid #1b2226', borderRadius: '12px', padding: '20px' }}>
+            <MacroLineChart 
+              title="Labor Market" 
+              subtitle="Unemployment Rate (%)" 
+              series={[{ id: 'ur', name: 'Unemployment', data: unemployment.data, unit: '%' }]} 
+              defaultRange="5Y" 
+            />
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
-// Helper Component for the Watchlist items
 function WatchlistItem({ label, value, change, isPositive }: any) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-      <span style={{ fontWeight: 600 }}>{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ fontWeight: 600, fontSize: '13px' }}>{label}</span>
       <div style={{ textAlign: 'right' }}>
-        <div>{value}</div>
-        <div style={{ fontSize: 11, color: isPositive ? '#4caf50' : '#ff5252' }}>{change}</div>
+        <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{value}</div>
+        <div style={{ fontSize: '11px', color: isPositive ? '#4caf50' : '#ff5252' }}>{change}</div>
       </div>
     </div>
   );
