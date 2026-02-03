@@ -29,7 +29,7 @@ async function fetchSeries(slug: string) {
 
 export default async function MacroPage() {
   // 1. FETCH ALL DATA
-  // Note: We are now including 'recessions' as the 5th series
+  // Includes 'recessions' as the 5th series to drive the gray vertical bars
   const [gdp, unemployment, cpi, fedFunds, recessions] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
@@ -39,11 +39,12 @@ export default async function MacroPage() {
   ]);
 
   // 2. DYNAMIC SIDEBAR LOGIC
-  // Matches the latest data points on your charts: GDP 24.0T and Unemployment 4.4%
+  // Current live values: GDP 24.0T and Unemployment 4.4%
   const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
   const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
 
-  // 3. LIVE MARKET DATA (Synced with your latest UI)
+  // 3. LIVE MARKET DATA
+  // Currently simulated values as seen in the live terminal
   const marketData = {
     sp500: { price: "5,026.11", change: "+0.45%", pos: true },
     yield10y: { price: "4.122%", change: "-0.01%", pos: false },
