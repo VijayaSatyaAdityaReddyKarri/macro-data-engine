@@ -28,7 +28,7 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  // Parallel Fetching: Grabbing 4 series from your database
+  // 1. FETCH ALL DATA
   const [gdp, unemployment, cpi, fedFunds] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
@@ -36,10 +36,17 @@ export default async function MacroPage() {
     fetchSeries('fed_funds')
   ]);
 
-  // DYNAMIC WATCHLIST LOGIC: 
-  // We grab the very last entry in the data arrays to show the "Latest" value in the sidebar
-  const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : "---";
-  const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : "---";
+  // 2. DYNAMIC SIDEBAR LOGIC
+  // We grab the last values from our database arrays
+  const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
+  const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
+
+  // 3. LIVE MARKET DATA (Simulated for now, next step is the API Key)
+  const marketData = {
+    sp500: { price: "5,026.11", change: "+0.45%", pos: true },
+    yield10y: { price: "4.122%", change: "-0.01%", pos: false },
+    dxy: { price: "103.98", change: "+0.12%", pos: true }
+  };
 
   return (
     <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', backgroundColor: 'transparent', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' }}>
@@ -48,7 +55,7 @@ export default async function MacroPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
-          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.7 (LIVE)</span>
+          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.8 (LIVE)</span>
         </div>
         <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
           <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
@@ -63,14 +70,15 @@ export default async function MacroPage() {
         <aside className="card" style={{ height: 'fit-content' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* Market data (Still static for now, we'll fix these next) */}
-            <WatchlistItem label="S&P 500" value="4,906.19" change="+1.12%" isPositive={true} />
-            <WatchlistItem label="US 10Y Yield" value="4.155%" change="-0.02%" isPositive={false} />
-            <WatchlistItem label="DXY Index" value="104.12" change="+0.08%" isPositive={true} />
+            
+            {/* Live Market Assets */}
+            <WatchlistItem label="S&P 500" value={marketData.sp500.price} change={marketData.sp500.change} isPositive={marketData.sp500.pos} />
+            <WatchlistItem label="US 10Y Yield" value={marketData.yield10y.price} change={marketData.yield10y.change} isPositive={marketData.yield10y.pos} />
+            <WatchlistItem label="DXY Index" value={marketData.dxy.price} change={marketData.dxy.change} isPositive={marketData.dxy.pos} />
             
             <div style={{ height: '1px', background: '#1b2226', margin: '5px 0' }} />
             
-            {/* DYNAMIC MACRO DATA: Pulling from your fetch calls above */}
+            {/* Dynamic Database Assets */}
             <WatchlistItem 
                label="Real GDP" 
                value={typeof latestGDPValue === 'number' ? `${(latestGDPValue / 1000).toFixed(1)}T` : "---"} 
@@ -79,9 +87,9 @@ export default async function MacroPage() {
             />
             <WatchlistItem 
                label="Unemployment" 
-               value={`${latestUnemploymentValue}%`} 
+               value={latestUnemploymentValue ? `${latestUnemploymentValue}%` : "---"} 
                change="Latest" 
-               isPositive={false} 
+               isPositive={latestUnemploymentValue < 5} 
             />
           </div>
         </aside>
