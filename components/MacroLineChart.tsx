@@ -25,7 +25,7 @@ ChartJS.register(
   Filler
 );
 
-// Custom plugin to draw the gray recession bars
+// Custom plugin to draw the gray recession bars behind the data
 const recessionPlugin = {
   id: 'recessionBars',
   beforeDraw: (chart: any, args: any, options: any) => {
@@ -35,13 +35,13 @@ const recessionPlugin = {
     if (!recessionData || recessionData.length === 0) return;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; // Very subtle gray for dark mode
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; // Subtle gray
 
     recessionData.forEach((point: any, index: number) => {
       if (point.value === 1) {
         const xPos = x.getPixelForValue(point.time);
         const nextXPos = x.getPixelForValue(recessionData[index + 1]?.time || point.time);
-        const width = Math.max(nextXPos - xPos, 2); // Ensure bar is visible
+        const width = Math.max(nextXPos - xPos, 2);
         ctx.fillRect(xPos, top, width, bottom - top);
       }
     });
@@ -65,18 +65,33 @@ export default function MacroLineChart({ title, subtitle, series, recessions }: 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    // INTERACTION FIX: This makes the hover trigger on the closest date point
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
+        enabled: true, // Force tooltips back on
         backgroundColor: '#1b2226',
         titleColor: '#888',
         bodyColor: '#fff',
         borderColor: '#333',
         borderWidth: 1,
         padding: 10,
-        displayColors: false,
+        displayColors: true,
+        callbacks: {
+          label: function(context: any) {
+            let label = context.dataset.label || '';
+            if (label) { label += ': '; }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y;
+            }
+            return label;
+          }
+        }
       },
-      // Passing recession data into our custom plugin
       recessionBars: {
         data: recessions || []
       }
@@ -100,7 +115,8 @@ export default function MacroLineChart({ title, subtitle, series, recessions }: 
       data: s.data.map(d => d.value),
       borderColor: '#fccb0b', // Sage Gold
       borderWidth: 2,
-      pointRadius: 0,
+      pointRadius: 0, // Keeps line clean
+      pointHoverRadius: 5, // Shows point on hover
       tension: 0.1,
     }))
   };
