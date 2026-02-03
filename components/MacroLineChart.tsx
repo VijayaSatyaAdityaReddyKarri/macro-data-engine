@@ -1,155 +1,72 @@
 'use client';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createChart, ColorType, LineStyle, IChartApi, ISeriesApi } from 'lightweight-charts';
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart, ColorType } from 'lightweight-charts';
 
-type Point = { time: string; value: number };
-
-type SeriesDef = {
-  id: string;
-  name: string;
-  unit?: string; // "YoY %" etc
-  data: Point[];
-};
-
-type RangeKey = '1Y' | '5Y' | 'MAX';
-
-function filterRange(data: Point[], range: RangeKey): Point[] {
-  if (range === 'MAX') return data;
-  const last = data[data.length - 1];
-  if (!last) return data;
-  
-  const lastDate = new Date(last.time);
-  const cutoff = new Date(lastDate);
-  cutoff.setFullYear(lastDate.getFullYear() - (range === '1Y' ? 1 : 5));
-  
-  return data.filter(d => new Date(d.time) >= cutoff);
-}
-
-export default function MacroLineChart({
-  title,
-  subtitle,
-  series,
-  defaultRange = '5Y',
-}: {
-  title: string;
-  subtitle?: string;
-  series: SeriesDef[];
-  defaultRange?: RangeKey;
-}) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRefs = useRef<Record<string, ISeriesApi<'Line'> | null>>({});
-
-  const [range, setRange] = useState<RangeKey>(defaultRange);
-
-  const ranged = useMemo(() => {
-    return series.map(s => ({ ...s, data: filterRange(s.data, range) }));
-  }, [series, range]);
+export default function MacroLineChart({ title, subtitle, series, defaultRange = 'MAX', unit = '' }: any) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<'LEVEL' | 'YoY'>('LEVEL'); // The Toggle State
 
   useEffect(() => {
-    if (!hostRef.current) return;
+    if (!chartContainerRef.current || !series[0]?.data.length) return;
 
-    // Create chart once
-    const chart = createChart(hostRef.current, {
-      height: 420,
-      layout: {
-        background: { type: ColorType.Solid, color: '#0b0f0f' },
-        textColor: '#e8ecf3',
-        fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255,255,255,0.06)' },
-        horzLines: { color: 'rgba(255,255,255,0.06)' },
-      },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.12)' },
-      timeScale: { borderColor: 'rgba(255,255,255,0.12)', timeVisible: true },
-      crosshair: {
-        vertLine: { style: LineStyle.Solid, labelBackgroundColor: '#d4af37' },
-        horzLine: { style: LineStyle.Solid, labelBackgroundColor: '#d4af37' },
-      },
+    const chart = createChart(chartContainerRef.current, {
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#d1d4dc' },
+      grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
+      width: chartContainerRef.current.clientWidth,
+      height: 300,
     });
 
-    chartRef.current = chart;
-
-    // Responsive width
-    const ro = new ResizeObserver(() => {
-      if (!hostRef.current) return;
-      chart.applyOptions({ width: hostRef.current.clientWidth });
+    const lineSeries = chart.addLineSeries({
+      color: '#ffd700',
+      lineWidth: 2,
     });
 
-    ro.observe(hostRef.current);
+    // --- CALCULATION LOGIC ---
+    let displayData = series[0].data;
+
+    if (mode === 'YoY') {
+      // Calculate % change from 1 year (12 months/4 quarters) ago
+      const lookback = series[0].id === 'gdp' ? 4 : 12; 
+      displayData = series[0].data.map((item: any, index: number) => {
+        if (index < lookback) return null;
+        const prevValue = series[0].data[index - lookback].value;
+        const yoy = ((item.value / prevValue) - 1) * 100;
+        return { time: item.time, value: yoy };
+      }).filter((i: any) => i !== null);
+    }
+
+    lineSeries.setData(displayData);
+    chart.timeScale().fitContent();
+
+    const handleResize = () => chart.applyOptions({ width: chartContainerRef.current!.clientWidth });
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
       chart.remove();
-      chartRef.current = null;
-      seriesRefs.current = {};
     };
-  }, []);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-
-    // Remove old series (simple + robust)
-    Object.values(seriesRefs.current).forEach(s => {
-      if (s) chart.removeSeries(s);
-    });
-    seriesRefs.current = {};
-
-    // Add series
-    ranged.forEach((s, idx) => {
-      const line = chart.addLineSeries({
-        lineWidth: 2,
-        lineStyle: idx === 0 ? LineStyle.Solid : LineStyle.Dashed,
-        color: idx === 0 ? '#d4af37' : undefined, // Gold for primary, auto for others
-      });
-      
-      // Fix: Typescript expects strict types, we cast if needed or ensure data is right
-      line.setData(s.data as any); 
-      seriesRefs.current[s.id] = line;
-    });
-
-    chart.timeScale().fitContent();
-  }, [ranged]);
+  }, [series, mode]);
 
   return (
-    <div style={{ border: '1px solid #1b2226', borderRadius: 16, overflow: 'hidden', background: '#0b0f0f' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '14px 14px 10px' }}>
+    <div className="card-glass" style={{ padding: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
         <div>
-          <div style={{ fontWeight: 800, letterSpacing: 0.2, color: '#fff' }}>{title}</div>
-          {subtitle && <div style={{ opacity: 0.7, fontSize: 13, color: '#ccc' }}>{subtitle}</div>}
+          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{title}</div>
+          <div style={{ fontSize: '12px', opacity: 0.6 }}>{subtitle}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['1Y', '5Y', 'MAX'] as RangeKey[]).map(k => (
-            <button
-              key={k}
-              onClick={() => setRange(k)}
-              style={{
-                borderRadius: 10,
-                padding: '8px 10px',
-                border: '1px solid #2a2f33',
-                background: k === range ? 'rgba(212,175,55,0.10)' : '#121619',
-                color: '#e8ecf3',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              {k}
-            </button>
-          ))}
+        {/* THE TOGGLE BUTTONS */}
+        <div style={{ display: 'flex', gap: '5px', background: '#1b2226', padding: '2px', borderRadius: '6px' }}>
+          <button 
+            onClick={() => setMode('LEVEL')}
+            style={{ padding: '4px 8px', fontSize: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: mode === 'LEVEL' ? '#ffd700' : 'transparent', color: mode === 'LEVEL' ? 'black' : 'white' }}
+          >LEVEL</button>
+          <button 
+            onClick={() => setMode('YoY')}
+            style={{ padding: '4px 8px', fontSize: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: mode === 'YoY' ? '#ffd700' : 'transparent', color: mode === 'YoY' ? 'black' : 'white' }}
+          >YoY %</button>
         </div>
       </div>
-      <div ref={hostRef} style={{ width: '100%' }} />
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '10px 14px 14px', opacity: 0.85, fontSize: 12 }}>
-        {series.map(s => (
-          <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ width: 10, height: 2, background: '#e8ecf3', display: 'inline-block' }} />
-            <span style={{ fontWeight: 800, color: '#fff' }}>{s.name}</span>
-            {s.unit && <span style={{ opacity: 0.7, color: '#ccc' }}>{s.unit}</span>}
-          </div>
-        ))}
-      </div>
+      <div ref={chartContainerRef} />
     </div>
   );
 }
