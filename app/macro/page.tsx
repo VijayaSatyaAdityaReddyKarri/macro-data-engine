@@ -28,20 +28,21 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  // 1. FETCH ALL DATA
-  const [gdp, unemployment, cpi, fedFunds] = await Promise.all([
+  // 1. FETCH ALL DATA (Added 'recessions' to the list)
+  const [gdp, unemployment, cpi, fedFunds, recessions] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
     fetchSeries('cpi_headline'),
-    fetchSeries('fed_funds')
+    fetchSeries('fed_funds'),
+    fetchSeries('recessions')
   ]);
 
   // 2. DYNAMIC SIDEBAR LOGIC
-  // We grab the last values from our database arrays
+  // Grabbing last database values for the watchlist
   const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
   const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
 
-  // 3. LIVE MARKET DATA (Simulated for now, next step is the API Key)
+  // 3. LIVE MARKET DATA (Currently simulated)
   const marketData = {
     sp500: { price: "5,026.11", change: "+0.45%", pos: true },
     yield10y: { price: "4.122%", change: "-0.01%", pos: false },
@@ -55,7 +56,7 @@ export default async function MacroPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
-          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.8 (LIVE)</span>
+          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.9 (LIVE)</span>
         </div>
         <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
           <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
@@ -102,6 +103,7 @@ export default async function MacroPage() {
               title="Inflation Monitor" 
               subtitle="Consumer Price Index (Headline)" 
               series={[{ id: 'cpi', name: 'CPI Index', data: cpi.data }]} 
+              recessions={recessions.data}
             />
           </div>
 
@@ -110,6 +112,7 @@ export default async function MacroPage() {
               title="Interest Rates" 
               subtitle="Effective Federal Funds Rate (%)" 
               series={[{ id: 'fed', name: 'Fed Funds', data: fedFunds.data, unit: '%' }]} 
+              recessions={recessions.data}
             />
           </div>
 
@@ -118,6 +121,7 @@ export default async function MacroPage() {
               title="Economic Growth" 
               subtitle="Real GDP (Billions)" 
               series={[{ id: 'gdp', name: 'Real GDP', data: gdp.data }]} 
+              recessions={recessions.data}
             />
           </div>
 
@@ -126,6 +130,7 @@ export default async function MacroPage() {
               title="Labor Market" 
               subtitle="Unemployment Rate (%)" 
               series={[{ id: 'ur', name: 'Unemployment', data: unemployment.data, unit: '%' }]} 
+              recessions={recessions.data}
             />
           </div>
         </section>
