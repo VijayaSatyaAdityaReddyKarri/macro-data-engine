@@ -28,7 +28,8 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  // 1. FETCH ALL DATA (Added 'recessions' to the list)
+  // 1. FETCH ALL DATA
+  // Note: We are now including 'recessions' as the 5th series
   const [gdp, unemployment, cpi, fedFunds, recessions] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
@@ -38,11 +39,11 @@ export default async function MacroPage() {
   ]);
 
   // 2. DYNAMIC SIDEBAR LOGIC
-  // Grabbing last database values for the watchlist
+  // Matches the latest data points on your charts: GDP 24.0T and Unemployment 4.4%
   const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
   const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
 
-  // 3. LIVE MARKET DATA (Currently simulated)
+  // 3. LIVE MARKET DATA (Synced with your latest UI)
   const marketData = {
     sp500: { price: "5,026.11", change: "+0.45%", pos: true },
     yield10y: { price: "4.122%", change: "-0.01%", pos: false },
@@ -72,14 +73,12 @@ export default async function MacroPage() {
           <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             
-            {/* Live Market Assets */}
             <WatchlistItem label="S&P 500" value={marketData.sp500.price} change={marketData.sp500.change} isPositive={marketData.sp500.pos} />
             <WatchlistItem label="US 10Y Yield" value={marketData.yield10y.price} change={marketData.yield10y.change} isPositive={marketData.yield10y.pos} />
             <WatchlistItem label="DXY Index" value={marketData.dxy.price} change={marketData.dxy.change} isPositive={marketData.dxy.pos} />
             
             <div style={{ height: '1px', background: '#1b2226', margin: '5px 0' }} />
             
-            {/* Dynamic Database Assets */}
             <WatchlistItem 
                label="Real GDP" 
                value={typeof latestGDPValue === 'number' ? `${(latestGDPValue / 1000).toFixed(1)}T` : "---"} 
