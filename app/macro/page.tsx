@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import MacroLineChart from '@/components/MacroLineChart';
 
 async function fetchSeries(slug: string) {
