@@ -1,7 +1,7 @@
 import MacroLineChart from '@/components/MacroLineChart';
 
 async function fetchSeries(slug: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/series/${slug}`, { cache: 'no-store' });
+  const res = await fetch(`https://macro-api-l59k.onrender.com/series/${slug}`, { cache: 'no-store' });
   if (!res.ok) return { data: [] };
   
   const json = await res.json();
