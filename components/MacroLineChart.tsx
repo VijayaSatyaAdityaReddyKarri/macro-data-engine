@@ -1,72 +1,117 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
 
-export default function MacroLineChart({ title, subtitle, series, defaultRange = 'MAX', unit = '' }: any) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<'LEVEL' | 'YoY'>('LEVEL'); // The Toggle State
+import React from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
 
-  useEffect(() => {
-    if (!chartContainerRef.current || !series[0]?.data.length) return;
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
-    const chart = createChart(chartContainerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#d1d4dc' },
-      grid: { vertLines: { color: 'rgba(42, 46, 57, 0.5)' }, horzLines: { color: 'rgba(42, 46, 57, 0.5)' } },
-      width: chartContainerRef.current.clientWidth,
-      height: 300,
+// Custom plugin to draw the gray recession bars
+const recessionPlugin = {
+  id: 'recessionBars',
+  beforeDraw: (chart: any, args: any, options: any) => {
+    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+    const recessionData = options.data;
+
+    if (!recessionData || recessionData.length === 0) return;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; // Very subtle gray for dark mode
+
+    recessionData.forEach((point: any, index: number) => {
+      if (point.value === 1) {
+        const xPos = x.getPixelForValue(point.time);
+        const nextXPos = x.getPixelForValue(recessionData[index + 1]?.time || point.time);
+        const width = Math.max(nextXPos - xPos, 2); // Ensure bar is visible
+        ctx.fillRect(xPos, top, width, bottom - top);
+      }
     });
+    ctx.restore();
+  }
+};
 
-    const lineSeries = chart.addLineSeries({
-      color: '#ffd700',
-      lineWidth: 2,
-    });
+interface MacroLineChartProps {
+  title: string;
+  subtitle?: string;
+  series: {
+    id: string;
+    name?: string;
+    data: { time: string; value: number }[];
+    unit?: string;
+  }[];
+  recessions?: { time: string; value: number }[];
+}
 
-    // --- CALCULATION LOGIC ---
-    let displayData = series[0].data;
-
-    if (mode === 'YoY') {
-      // Calculate % change from 1 year (12 months/4 quarters) ago
-      const lookback = series[0].id === 'gdp' ? 4 : 12; 
-      displayData = series[0].data.map((item: any, index: number) => {
-        if (index < lookback) return null;
-        const prevValue = series[0].data[index - lookback].value;
-        const yoy = ((item.value / prevValue) - 1) * 100;
-        return { time: item.time, value: yoy };
-      }).filter((i: any) => i !== null);
+export default function MacroLineChart({ title, subtitle, series, recessions }: MacroLineChartProps) {
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1b2226',
+        titleColor: '#888',
+        bodyColor: '#fff',
+        borderColor: '#333',
+        borderWidth: 1,
+        padding: 10,
+        displayColors: false,
+      },
+      // Passing recession data into our custom plugin
+      recessionBars: {
+        data: recessions || []
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#444', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
+      },
+      y: {
+        grid: { color: '#1b2226' },
+        ticks: { color: '#888' }
+      }
     }
+  };
 
-    lineSeries.setData(displayData);
-    chart.timeScale().fitContent();
-
-    const handleResize = () => chart.applyOptions({ width: chartContainerRef.current!.clientWidth });
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-    };
-  }, [series, mode]);
+  const data = {
+    labels: series[0]?.data.map(d => d.time) || [],
+    datasets: series.map(s => ({
+      label: s.name || s.id,
+      data: s.data.map(d => d.value),
+      borderColor: '#fccb0b', // Sage Gold
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.1,
+    }))
+  };
 
   return (
-    <div className="card-glass" style={{ padding: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{title}</div>
-          <div style={{ fontSize: '12px', opacity: 0.6 }}>{subtitle}</div>
-        </div>
-        {/* THE TOGGLE BUTTONS */}
-        <div style={{ display: 'flex', gap: '5px', background: '#1b2226', padding: '2px', borderRadius: '6px' }}>
-          <button 
-            onClick={() => setMode('LEVEL')}
-            style={{ padding: '4px 8px', fontSize: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: mode === 'LEVEL' ? '#ffd700' : 'transparent', color: mode === 'LEVEL' ? 'black' : 'white' }}
-          >LEVEL</button>
-          <button 
-            onClick={() => setMode('YoY')}
-            style={{ padding: '4px 8px', fontSize: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: mode === 'YoY' ? '#ffd700' : 'transparent', color: mode === 'YoY' ? 'black' : 'white' }}
-          >YoY %</button>
-        </div>
+    <div style={{ height: '300px', width: '100%' }}>
+      <div style={{ marginBottom: '15px' }}>
+        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#fff' }}>{title}</h3>
+        {subtitle && <p style={{ margin: 0, fontSize: '11px', color: '#888' }}>{subtitle}</p>}
       </div>
-      <div ref={chartContainerRef} />
+      <Line options={options as any} data={data} plugins={[recessionPlugin]} />
     </div>
   );
 }
