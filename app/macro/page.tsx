@@ -11,8 +11,10 @@ async function fetchSeries(slug: string) {
 
     if (!res.ok) return { data: [] };
     const json = await res.json();
+
     if (!json || !json.data || !Array.isArray(json.data)) return { data: [] };
 
+    // DATA FIX: Formats the data correctly for the chart library
     const cleanData = json.data.map((item: any) => ({
       time: item.date,
       value: item.value
@@ -26,21 +28,22 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  const [gdp, unemployment, cpi] = await Promise.all([
+  // Parallel Fetching: Now grabbing 4 series including the new Fed Funds Rate
+  const [gdp, unemployment, cpi, fedFunds] = await Promise.all([
     fetchSeries('real_gdp'),
     fetchSeries('unemployment_rate'),
-    fetchSeries('cpi_headline')
+    fetchSeries('cpi_headline'),
+    fetchSeries('fed_funds') // Make sure you ran the backend ingestion for this slug!
   ]);
 
   return (
-    // We set backgroundColor to 'transparent' here so the glow in globals.css shows through
     <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', backgroundColor: 'transparent', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' }}>
       
       {/* TERMINAL HEADER */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
-          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.5 (LIVE)</span>
+          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 2.6 (LIVE)</span>
         </div>
         <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
           <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
@@ -51,7 +54,7 @@ export default async function MacroPage() {
       {/* GRID CONTAINER */}
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '25px' }}>
         
-        {/* WATCHLIST - Using the 'card' class for the frosted glass effect */}
+        {/* WATCHLIST */}
         <aside className="card" style={{ height: 'fit-content' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -64,10 +67,11 @@ export default async function MacroPage() {
           </div>
         </aside>
 
-        {/* MAIN CHART GRID */}
+        {/* MAIN CHART GRID - Now 4 charts */}
         <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
           
-          <div style={{ gridColumn: '1 / -1' }} className="card">
+          {/* Top Left: Inflation */}
+          <div className="card">
             <MacroLineChart 
               title="Inflation Monitor" 
               subtitle="Consumer Price Index (Headline)" 
@@ -75,6 +79,16 @@ export default async function MacroPage() {
             />
           </div>
 
+          {/* Top Right: Interest Rates (The NEW Chart) */}
+          <div className="card">
+            <MacroLineChart 
+              title="Interest Rates" 
+              subtitle="Effective Federal Funds Rate (%)" 
+              series={[{ id: 'fed', name: 'Fed Funds', data: fedFunds.data, unit: '%' }]} 
+            />
+          </div>
+
+          {/* Bottom Left: Growth */}
           <div className="card">
             <MacroLineChart 
               title="Economic Growth" 
@@ -83,6 +97,7 @@ export default async function MacroPage() {
             />
           </div>
 
+          {/* Bottom Right: Labor Market */}
           <div className="card">
             <MacroLineChart 
               title="Labor Market" 
