@@ -13,7 +13,7 @@ async function fetchMarketPrice(symbol: string) {
   try {
     const res = await fetch(
       `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}`,
-      { next: { revalidate: 60 } } // Refresh data every minute
+      { next: { revalidate: 60 } } 
     );
     const data = await res.json();
     const quote = data["Global Quote"];
@@ -63,7 +63,7 @@ async function fetchSeries(slug: string) {
 }
 
 export default async function MacroPage() {
-  // 1. PARALLEL FETCHING: Market Data + Macro Database Data
+  // Parallel Fetching
   const [
     gdp, 
     unemployment, 
@@ -79,27 +79,25 @@ export default async function MacroPage() {
     fetchSeries('cpi_headline'),
     fetchSeries('fed_funds'),
     fetchSeries('recessions'),
-    fetchMarketPrice('SPY'),  // S&P 500 Proxy
-    fetchMarketPrice('UUP'),  // Dollar Index Proxy
-    fetchMarketPrice('IEF')   // 7-10Y Treasury Proxy
+    fetchMarketPrice('SPY'),
+    fetchMarketPrice('UUP'),
+    fetchMarketPrice('IEF')
   ]);
 
-  // 2. DYNAMIC SIDEBAR LOGIC (Database values)
   const latestGDPValue = gdp.data.length > 0 ? gdp.data[gdp.data.length - 1].value : null;
   const latestUnemploymentValue = unemployment.data.length > 0 ? unemployment.data[unemployment.data.length - 1].value : null;
 
   return (
     <main style={{ maxWidth: '1450px', margin: '0 auto', padding: '20px', backgroundColor: 'transparent', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' }}>
       
-      {/* TERMINAL HEADER */}
+      {/* HEADER: Updated to SKXY TERMINAL and Version removed */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #1b2226', paddingBottom: '15px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px', margin: 0 }}>SAGE TERMINAL</h1>
-          <span style={{ color: '#ff5252', fontSize: '10px', fontWeight: 'bold' }}>VERSION 3.1 (TERMINAL GRID)</span>
+          <h1 style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-1.5px', margin: 0, color: '#fff' }}>SKXY TERMINAL</h1>
         </div>
-        <div style={{ textAlign: 'right', fontSize: '12px', opacity: 0.5 }}>
+        <div style={{ textAlign: 'right', fontSize: '11px', opacity: 0.5, letterSpacing: '1px' }}>
           <div>LIVE CONNECTION: <span style={{ color: '#4caf50' }}>ACTIVE</span></div>
-          <div>REGION: US_MACRO</div>
+          <div>DATASET: US_MACRO_CORE</div>
         </div>
       </header>
 
@@ -111,24 +109,22 @@ export default async function MacroPage() {
           <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.5, marginBottom: '20px', letterSpacing: '1px' }}>WATCHLIST</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* Real-Time Market Assets from Alpha Vantage */}
             <WatchlistItem label="S&P 500 (SPY)" value={sp500.price} change={sp500.change} isPositive={sp500.pos} />
             <WatchlistItem label="US 10Y Yield (IEF)" value={yields.price} change={yields.change} isPositive={yields.pos} />
             <WatchlistItem label="DXY Index (UUP)" value={dxy.price} change={dxy.change} isPositive={dxy.pos} />
             
             <div style={{ height: '1px', background: '#1b2226', margin: '5px 0' }} />
             
-            {/* Dynamic Macro Data from Database */}
             <WatchlistItem 
                label="Real GDP" 
                value={typeof latestGDPValue === 'number' ? `${(latestGDPValue / 1000).toFixed(1)}T` : "---"} 
-               change="Latest" 
+               change="Quarterly" 
                isPositive={true} 
             />
             <WatchlistItem 
                label="Unemployment" 
                value={latestUnemploymentValue ? `${latestUnemploymentValue}%` : "---"} 
-               change="Latest" 
+               change="Monthly" 
                isPositive={latestUnemploymentValue < 5} 
             />
           </div>
@@ -137,7 +133,7 @@ export default async function MacroPage() {
         {/* MAIN TERMINAL GRID */}
         <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
           
-          {/* BIG CHART: Inflation vs Policy (Spans 2 columns) */}
+          {/* LARGE MAIN CHART */}
           <div className="card" style={{ gridColumn: '1 / -1', background: '#0b0f0f', border: '1px solid #1b2226', borderRadius: '16px', padding: '20px' }}>
             <MacroLineChart 
               title="Monetary Policy & Inflation" 
